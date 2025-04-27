@@ -3,7 +3,7 @@ import { Geist } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import Link from 'next/link';
-import { BookOpenText } from 'lucide-react'; // Minimalist icon
+import { BookOpenText, LogIn } from 'lucide-react'; // Import LogIn icon
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -42,16 +42,14 @@ function Header() {
                 <Link href="/" className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-2">
                    <BookOpenText className="w-6 h-6 text-accent" /> Content Canvas
                 </Link>
-                <div>
-                    <Link href="/" className="text-foreground hover:text-accent transition-colors mr-4">
+                <div className='flex items-center gap-4'>
+                    <Link href="/" className="text-foreground hover:text-accent transition-colors">
                         Home
                     </Link>
-                     {/* Removed Admin Panel link - access via /admin/login now */}
-                     {/*
-                     <Link href="/admin" className="text-foreground hover:text-accent transition-colors">
-                        Admin Panel
+                    {/* Add Admin Login button */}
+                     <Link href="/admin/login" className="text-foreground hover:text-accent transition-colors flex items-center gap-1">
+                        <LogIn className="w-4 h-4" /> Admin
                     </Link>
-                     */}
                 </div>
             </nav>
         </header>
