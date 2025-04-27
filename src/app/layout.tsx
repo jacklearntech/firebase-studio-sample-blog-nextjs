@@ -46,9 +46,12 @@ function Header() {
                     <Link href="/" className="text-foreground hover:text-accent transition-colors mr-4">
                         Home
                     </Link>
+                     {/* Removed Admin Panel link - access via /admin/login now */}
+                     {/*
                      <Link href="/admin" className="text-foreground hover:text-accent transition-colors">
                         Admin Panel
                     </Link>
+                     */}
                 </div>
             </nav>
         </header>

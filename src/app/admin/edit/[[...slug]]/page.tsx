@@ -9,11 +9,15 @@ import { getPostById, createPost, updatePost } from '@/lib/posts';
 import type { BlogPost, BlogPostInput } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea'; // Make sure Textarea component exists
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
+
+const ADMIN_TOKEN_KEY = 'adminApiToken';
+const VALID_TOKEN = process.env.NEXT_PUBLIC_ADMIN_API_TOKEN;
+
 
 // Zod schema for validation
 const postSchema = z.object({
@@ -28,7 +32,9 @@ export default function EditPostPage() {
   const params = useParams(); // { slug: ['postId'] } or { slug: undefined }
   const postId = params?.slug?.[0]; // Extract postId if editing
   const isEditing = !!postId;
-  const [loading, setLoading] = useState(isEditing); // Only load if editing
+  const [loading, setLoading] = useState(isEditing); // Only load post data if editing
+  const [authLoading, setAuthLoading] = useState(true); // Loading state for auth check
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -40,12 +46,38 @@ export default function EditPostPage() {
     },
   });
 
+  // --- Authentication Check ---
+   useEffect(() => {
+     if (!VALID_TOKEN) {
+        console.error("Admin API token is not configured. Set NEXT_PUBLIC_ADMIN_API_TOKEN.");
+        setError("Admin access is not configured properly.");
+        setIsAuthenticated(false);
+        setAuthLoading(false);
+        return;
+     }
 
+     const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+     if (token === VALID_TOKEN) {
+         setIsAuthenticated(true);
+     } else {
+         setIsAuthenticated(false);
+         toast({
+             title: "Unauthorized",
+             description: "Please log in to access this page.",
+             variant: "destructive",
+         });
+         router.push('/admin/login'); // Redirect if not authenticated
+     }
+     setAuthLoading(false); // Mark auth check as complete
+   }, [router, toast]);
+
+
+  // --- Fetch Post Data (only if authenticated and editing) ---
   useEffect(() => {
-    if (isEditing && postId) {
+    if (isAuthenticated && isEditing && postId) { // Ensure authenticated before fetching
       const fetchPost = async () => {
         try {
-          setLoading(true);
+          setLoading(true); // Start loading post data
           setError(null);
           const post = await getPostById(postId);
           if (post) {
@@ -60,16 +92,23 @@ export default function EditPostPage() {
           setError('Failed to load post data.');
           toast({ title: "Error", description: "Failed to load post data.", variant: "destructive" });
         } finally {
-          setLoading(false);
+          setLoading(false); // Finish loading post data
         }
       };
       fetchPost();
+    } else if (isAuthenticated && !isEditing) {
+       setLoading(false); // Not editing, so no post data loading needed
     }
      // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditing, postId, router, form, toast]); // Add dependencies
+  }, [isAuthenticated, isEditing, postId, router, form, toast]); // Add isAuthenticated
 
 
   const onSubmit: SubmitHandler<PostFormData> = async (data) => {
+     if (!isAuthenticated) {
+         toast({ title: "Error", description: "You are not authorized to perform this action.", variant: "destructive" });
+         return;
+     }
+
      const postData: BlogPostInput = {
         ...data,
         date: new Date().toISOString(), // Set current date on save/update
@@ -77,6 +116,7 @@ export default function EditPostPage() {
 
     try {
         setError(null);
+        setLoading(true); // Indicate saving process
         if (isEditing && postId) {
             await updatePost(postId, postData);
             toast({ title: "Success", description: "Blog post updated successfully." });
@@ -91,9 +131,21 @@ export default function EditPostPage() {
       const action = isEditing ? 'update' : 'create';
       setError(`Failed to ${action} post. Please try again.`);
       toast({ title: "Error", description: `Failed to ${action} post.`, variant: "destructive" });
+    } finally {
+       setLoading(false); // Finish saving process
     }
   };
 
+  if (authLoading) {
+      return <div className="flex justify-center items-center h-64"><p>Verifying access...</p></div>;
+  }
+
+   if (!isAuthenticated) {
+     // Render minimal content or a message, as redirection should handle this case mostly
+     return <div className="flex justify-center items-center h-64"><p>Access Denied. Redirecting...</p></div>;
+   }
+
+   // Show skeleton while loading post data *only* when editing
    if (loading && isEditing) {
     return (
       <Card className="max-w-2xl mx-auto subtle-slide-up">
@@ -134,7 +186,7 @@ export default function EditPostPage() {
                     <FormItem>
                     <FormLabel>Title</FormLabel>
                     <FormControl>
-                        <Input placeholder="Enter post title" {...field} className="bg-background" />
+                        <Input placeholder="Enter post title" {...field} className="bg-background" disabled={form.formState.isSubmitting} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -147,7 +199,7 @@ export default function EditPostPage() {
                     <FormItem>
                     <FormLabel>Content</FormLabel>
                     <FormControl>
-                        <Textarea placeholder="Write your blog post content here..." {...field} rows={10} className="bg-background"/>
+                        <Textarea placeholder="Write your blog post content here..." {...field} rows={10} className="bg-background" disabled={form.formState.isSubmitting}/>
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -155,7 +207,7 @@ export default function EditPostPage() {
                 />
             </CardContent>
             <CardFooter className="flex justify-end pt-6 border-t">
-                <Button type="submit" disabled={form.formState.isSubmitting} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                <Button type="submit" disabled={form.formState.isSubmitting || loading} className="bg-accent text-accent-foreground hover:bg-accent/90">
                 {form.formState.isSubmitting ? 'Saving...' : (isEditing ? 'Update Post' : 'Create Post')}
                 </Button>
             </CardFooter>
